@@ -144,21 +144,30 @@ https://www.youtube.com/watch?v=4xDzrJKXOOY   Boiler Room (mezcla 1h)
 - [x] Crear repo con `README.md` y `PLAN.md`
 - [x] `git init`, branch `main`, `.gitignore` para Python
 - [x] Renombrar proyecto a `yt-links-mp3` (paquete y CLI)
-- [ ] `pyproject.toml` con deps: `yt-dlp`, `click`, `pydantic`, `pyyaml`, `loguru`, `rich`
-- [ ] Estructura de carpetas `src/` y `tests/`
-- [ ] `config.example.yaml` y `links.example.txt`
+- [x] `pyproject.toml` con deps: `yt-dlp`, `click`, `pydantic`, `pyyaml`, `loguru`, `rich`
+- [x] Estructura de carpetas `src/` y `tests/`
+- [x] `config.example.yaml` y `links.example.txt`
+- [x] Repo remoto renombrado: `youtube-to-mp3-bydevie` → `yt-links-mp3`
+- [x] Virtualenv creado (Python 3.9.6 disponible; 3.11/3.12 pendiente)
+- [x] Paquete instalable: `pip install -e .` deja `yt-links-mp3` disponible en PATH
 
 ### Fase 1 — MVP funcional (4–6h)
-- [ ] `linklist.py`: parser del archivo de links (comentarios, vacíos, IDs solos, dedupe)
-- [ ] `cli.py` con comando `download <archivo.txt>` que toma el archivo como argumento
-- [ ] `cli.py` con comando `validate <archivo.txt>` que muestra cuántos links válidos hay sin descargar
-- [ ] `downloader.py`: por cada URL, usa `yt-dlp` para descargar `bestaudio` y convertir a MP3 con `ffmpeg` postprocess
-- [ ] `paths.py`: sanitiza nombres de archivo (caracteres prohibidos, longitud máxima)
-- [ ] `progress.py`: barra de progreso global con `rich`
-- [ ] Logging a consola con `loguru`
-- [ ] Salida por defecto: `~/Music/Downloads/<Artist>/<Album>/NN - Title.mp3`
+- [x] `linklist.py`: parser del archivo de links (comentarios, vacíos, IDs solos, dedupe)
+- [x] `cli.py` con comando `download <archivo.txt>` que toma el archivo como argumento
+- [x] `cli.py` con comando `validate <archivo.txt>` que muestra cuántos links válidos hay sin descargar
+- [x] `downloader.py`: por cada URL, usa `yt-dlp` para descargar `bestaudio` y convertir a MP3 con `ffmpeg` postprocess
+- [x] `paths.py`: sanitiza nombres de archivo (caracteres prohibidos, longitud máxima)
+- [x] `progress.py`: barra de progreso global con `rich`
+- [x] Logging a consola con `loguru`
+- [ ] Salida por defecto: `~/Music/Downloads/<Artist>/<Album>/NN - Title.mp3` *(queda Fase 2: hoy sale plano como `~/Music/Downloads/<id>.mp3`)*
 
-**Criterio de aceptación:** dado un `links.txt` con 10 URLs de videos individuales, produce 10 MP3s válidos en menos de 5 minutos.
+**Criterio de aceptación:** dado un `links.txt` con 10 URLs de videos individuales, produce 10 MP3s válidos en menos de 5 minutos. ⚠️ *Pendiente de validación real: yt-dlp devuelve `403 Forbidden` en la primera corrida de prueba — probable bloqueo regional o de IP. El CLI funciona end-to-end; falta validar con una IP/red que no esté bloqueada por YouTube.*
+
+#### Decisiones de implementación de Fase 1
+- **Descargas en serie por ahora** (en `cli.py`). `downloader.download_all()` ya existe con `ThreadPoolExecutor`, pero `cli.download` itera secuencial para mantener la barra de progreso exacta. Migración a paralelo con callback de progress queda para Fase 3.
+- **Outputs flat por ahora**: yt-dlp escribe `<id>.mp3` en `output_dir` (no estructura por artista/álbum aún).
+- **Sanitización ya implementada** (`paths.sanitize_component`) pero no aplicada a outputs en Fase 1 (Fase 2).
+- **9/9 tests pasando** en `tests/test_linklist.py`.
 
 ### Fase 2 — Metadatos ricos (3–4h)
 - [ ] `metadata.py`: extraer artista/título/álbum de la descripción/título del video con heurísticas
@@ -279,8 +288,21 @@ yt-links-mp3 download ~/Music/links.txt.failed  # reintenta esos
 
 ## 🚦 Estado actual
 
-**Fase:** 0 — Bootstrap ✅ (parcial, refactor en curso)
-**Próximo paso:** Fase 1 — MVP funcional (parser de links + descarga básica)
+**Fase:** 1 — MVP funcional ✅ (descarga básica operativa, falta estructura de carpetas y naming por metadatos)
+**Próximo paso:** Fase 2 — Metadatos ricos + estructura de carpetas por artista/álbum
+
+### Lo que funciona hoy (post Fase 0 + Fase 1)
+- `yt-links-mp3 validate <archivo.txt>` → cuenta links válidos y reporta líneas ignoradas
+- `yt-links-mp3 download <archivo.txt>` → descarga secuencial con barra de progreso, log de fallos, y genera `links.txt.failed` para reintentar
+- `yt-links-mp3 download --dry-run` → preview sin tocar disco
+- `yt-links-mp3 download --concurrency N` → *override disponible pero no aplicado (loop secuencial en cli)*
+- Outputs en `~/Music/Downloads/<video_id>.mp3` (flat, sin estructura de artista/álbum — viene en Fase 2)
+- Tests: 9/9 pasando
+
+### Notas operativas
+- **Python 3.9.6 en el sistema.** `pyproject.toml` declara `>=3.9`. yt-dlp deprecó Python 3.9 pero funciona. Pendiente: instalar Python 3.11 vía `brew install python@3.11` para CI matrix y eliminar el warning.
+- **ffmpeg** requerido por yt-dlp para el postprocess a MP3. No verificado en este entorno.
+- **403 Forbidden** observado en pruebas contra YouTube: probable rate-limit / bloqueo regional, no bug del CLI.
 
 ---
 

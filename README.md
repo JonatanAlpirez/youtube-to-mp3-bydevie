@@ -6,17 +6,34 @@ Descargador de música desde YouTube a partir de un **archivo de texto con URLs*
 
 ---
 
-## ✨ Características
+## 🚧 Estado actual
+
+**Fase 1 — MVP funcional** ✅
+
+Lo que funciona hoy:
+- Parser tolerante de archivos de links (comentarios, líneas vacías, IDs solos, dedupe).
+- `yt-links-mp3 validate <archivo>` — preflight sin descargar.
+- `yt-links-mp3 download <archivo>` — descarga con barra de progreso, log de fallos, y `links.txt.failed` para reintentar.
+- `yt-links-mp3 download --dry-run` — preview sin tocar disco.
+- 9/9 tests pasando.
+
+**Próximo:** Fase 2 — metadatos ricos, portadas embebidas, estructura de carpetas por artista/álbum (hoy los MP3s salen flat como `<video_id>.mp3`).
+
+Ver [`PLAN.md`](./PLAN.md) para el roadmap completo y el detalle de qué viene en cada fase.
+
+---
+
+## ✨ Características (planeadas y en desarrollo)
 
 - Lee un archivo de texto con URLs de videos individuales (uno por línea).
-- Tolera comentarios (`#`), líneas vacías, IDs solos (`dQw4w9WgXcQ`), y dedupe automático.
-- Convierte cada video a MP3 con metadatos limpios: título, artista, álbum, número de pista, año, portada.
-- Nombra los archivos con un patrón consistente (basado en metadatos, no en el título del video).
-- Maneja duplicados y re-descargas (skip si ya existe con la misma calidad).
-- Concurrencia configurable para acelerar la descarga.
+- Tolera comentarios (`#`, `//`), líneas vacías, IDs solos (`dQw4w9WgXcQ`), y dedupe automático.
+- Convierte cada video a MP3 con metadatos limpios: título, artista, álbum, número de pista, año, portada. *(metadatos completos llegan en Fase 2)*
+- Nombra los archivos con un patrón consistente (basado en metadatos, no en el título del video). *(llega en Fase 2)*
+- Maneja duplicados y re-descargas (skip si ya existe con la misma calidad). *(skip_existing en config, lógica llega en Fase 3)*
+- Concurrencia configurable para acelerar la descarga. *(config disponible, ejecución secuencial por ahora)*
 - Progreso por video y progreso global del batch.
 - Modo dry-run para previsualizar qué se descargaría sin tocar disco.
-- Auto-reanudación: si fallan links, los escribe a `links.txt.failed` para reintentar.
+- Auto-reanudación: si fallan links, los escribe a `links.txt.failed` para reintentar. *(esqueleto funcionando, refinamiento en Fase 3)*
 
 ---
 
@@ -26,7 +43,7 @@ Descargador de música desde YouTube a partir de un **archivo de texto con URLs*
 | --------------------- | ----------------------------------------- | ----------------------------------------------------------------------- |
 | Descarga de video     | [`yt-dlp`](https://github.com/yt-dlp/yt-dlp) | Mantenido, soporte de URLs individuales, selectores de formato, postprocesado. |
 | Extracción de audio   | `ffmpeg`                                  | Estándar de facto para muxing/conversión.                               |
-| Lenguaje              | Python 3.11+                              | Ecosistema, scripts, CLI limpio.                                        |
+| Lenguaje              | Python 3.9+ (probado en 3.9.6; 3.11+ recomendado) | Ecosistema, scripts, CLI limpio. yt-dlp deprecó Python 3.9 pero funciona. |
 | CLI                   | [`click`](https://palletsprojects.com/p/click/) | Argumentos tipados, subcomandos, experiencia pro.                     |
 | Config                | `pydantic-settings` + YAML               | Validación + archivo de config legible.                                |
 | Logging               | `loguru`                                  | Salida colorida en consola + archivo rotado.                            |
@@ -44,14 +61,26 @@ brew install ffmpeg        # macOS
 # sudo apt install ffmpeg # Debian/Ubuntu
 
 # 2. Clonar e instalar
-git clone <repo-url> yt-links-mp3
+git clone https://github.com/JonatanAlpirez/yt-links-mp3.git
 cd yt-links-mp3
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
+
+# Opcional: instalar pytest para correr los tests
+pip install pytest
 ```
 
-> El comando `yt-links-mp3` quedará disponible en tu shell.
+> El comando `yt-links-mp3` quedará disponible en tu shell mientras el venv esté activado.
+
+### Requisitos de Python
+
+Probado en Python 3.9.6. Recomendado Python 3.11+ (yt-dlp deprecó 3.9 y emite un warning). Para usar 3.11:
+
+```bash
+brew install python@3.11
+python3.11 -m venv .venv  # recrear el venv con la versión nueva
+```
 
 ---
 
@@ -191,6 +220,18 @@ yt-links-mp3 download ~/Music/links.txt
 cat ~/Music/links.txt.failed     # solo los que fallaron
 yt-links-mp3 download ~/Music/links.txt.failed  # reintenta esos
 ```
+
+---
+
+## 🧪 Tests
+
+```bash
+# Con el venv activado:
+pytest                              # corre todos los tests
+pytest tests/test_linklist.py -v    # solo el parser de links
+```
+
+Estado actual: **9/9 tests pasando** (`tests/test_linklist.py` cubre el parser de links).
 
 ---
 

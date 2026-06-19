@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "yt-links-mp3"
+version = "0.1.0"
+description = "Descargador de música desde YouTube a partir de un archivo de links"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Jonatan Alpirez" }]
+keywords = ["youtube", "mp3", "downloader", "yt-dlp", "cli"]
+
+dependencies = [
+    "yt-dlp>=2024.5.27",
+    "click>=8.1.7",
+    "pydantic>=2.7",
+    "pyyaml>=6.0.1",
+    "loguru>=0.7.2",
+    "rich>=13.7.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2",
+    "pytest-cov>=5.0",
+    "ruff>=0.4",
+    "mypy>=1.10",
+]
+
+[project.scripts]
+yt-links-mp3 = "yt_links_mp3.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/JonatanAlpirez/yt-links-mp3"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+yt_links_mp3 = ["py.typed"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.9"
+strict = true
+warn_return_any = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
