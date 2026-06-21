@@ -55,14 +55,27 @@ Ver [`PLAN.md`](./PLAN.md) para el roadmap completo y el detalle de qué viene e
 
 ## 📦 Instalación
 
-```bash
-# 1. Dependencias de sistema
-brew install ffmpeg        # macOS
-# sudo apt install ffmpeg # Debian/Ubuntu
+El proyecto es Python puro y multiplataforma (macOS, Linux, Windows). Lo único externo que necesitás es `ffmpeg` para la conversión a MP3.
 
-# 2. Clonar e instalar
-git clone https://github.com/JonatanAlpirez/yt-links-mp3.git
-cd yt-links-mp3
+### 1. Dependencias de sistema
+
+| SO | Cómo instalar ffmpeg |
+| --- | --- |
+| **macOS** | `brew install ffmpeg` |
+| **Debian / Ubuntu** | `sudo apt update && sudo apt install ffmpeg` |
+| **Fedora** | `sudo dnf install ffmpeg` |
+| **Arch / Manjaro** | `sudo pacman -S ffmpeg` |
+| **Windows** | `winget install ffmpeg` (recomendado) <br> o descargar el build desde [gyan.dev/ffmpeg/builds](https://www.gyan.dev/ffmpeg/builds/) y agregar la carpeta `bin` al `PATH` |
+
+> ✅ Verificá que esté disponible: `ffmpeg -version` debe responder.
+
+### 2. Clonar e instalar el proyecto
+
+#### macOS / Linux
+
+```bash
+git clone https://github.com/JonatanAlpirez/youtube-to-mp3-bydevie.git
+cd youtube-to-mp3-bydevie
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
@@ -71,16 +84,43 @@ pip install -e .
 pip install pytest
 ```
 
-> El comando `yt-links-mp3` quedará disponible en tu shell mientras el venv esté activado.
+#### Windows (PowerShell)
 
-### Requisitos de Python
+```powershell
+git clone https://github.com/JonatanAlpirez/youtube-to-mp3-bydevie.git
+cd youtube-to-mp3-bydevie
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -e .
 
-Probado en Python 3.9.6. Recomendado Python 3.11+ (yt-dlp deprecó 3.9 y emite un warning). Para usar 3.11:
-
-```bash
-brew install python@3.11
-python3.11 -m venv .venv  # recrear el venv con la versión nueva
+# Opcional: instalar pytest para correr los tests
+pip install pytest
 ```
+
+#### Windows (CMD)
+
+```cmd
+git clone https://github.com/JonatanAlpirez/youtube-to-mp3-bydevie.git
+cd youtube-to-mp3-bydevie
+python -m venv .venv
+.venv\Scripts\activate.bat
+pip install -e .
+```
+
+> 💡 Si PowerShell bloquea la activación del venv con un error de "running scripts is disabled", ejecutá una sola vez:
+> `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`
+
+> El comando `yt-links-mp3` quedará disponible en tu shell mientras el venv esté activado. En Windows también funciona desde PowerShell y CMD.
+
+### 3. Requisitos de Python
+
+Probado en Python 3.9.6. Recomendado Python 3.11+ (yt-dlp deprecó 3.9 y emite un warning).
+
+| SO | Instalar Python 3.11+ |
+| --- | --- |
+| **macOS** | `brew install python@3.11` y luego `python3.11 -m venv .venv` |
+| **Windows** | Descargar desde [python.org](https://www.python.org/downloads/) (marcá "Add Python to PATH" en el instalador) y luego `py -3.11 -m venv .venv` |
+| **Linux** | Generalmente viene por defecto. Si no: `sudo apt install python3.11 python3.11-venv` |
 
 ---
 
