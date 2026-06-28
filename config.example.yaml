@@ -23,23 +23,24 @@ filename_template: "{track_number:02d} - {artist} - {title}.{ext}"
 
 # Regex (case-insensitive) a borrar del título al limpiar.
 # Extensible: agregar/quitar entradas según necesidad.
+# IMPORTANTE: usar single quotes para que YAML no interprete \ como escape.
 cleanup_patterns:
-  - "\(official video\)"
-  - "\(official music video\)"
-  - "\[official video\]"
-  - "\(official\)"
-  - "\[official\]"
-  - "\(lyric(?:s)? video\)"
-  - "\(lyric(?:s)?\)"
-  - "\(lyrics?\)"
-  - "\(hd\)"
-  - "\[hd\]"
-  - "\bhd\b"
-  - "official video"
-  - "official music video"
-  - "music video"
-  - "\blyric(?:s)? video\b"
-  - "\blyrics?\b"
+  - '\(official video\)'
+  - '\(official music video\)'
+  - '\[official video\]'
+  - '\(official\)'
+  - '\[official\]'
+  - '\(lyric(?:s)? video\)'
+  - '\(lyric(?:s)?\)'
+  - '\(lyrics?\)'
+  - '\(hd\)'
+  - '\[hd\]'
+  - '\bhd\b'
+  - 'official video'
+  - 'official music video'
+  - 'music video'
+  - '\blyric(?:s)? video\b'
+  - '\blyrics?\b'
 
 # Archivo de links fallidos (auto-generado cuando algo falla)
 # Útil para reintentar: yt-links-mp3 download links.txt.failed

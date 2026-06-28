@@ -193,17 +193,17 @@ filename_template: "{track_number:02d} - {artist} - {title}.{ext}"
 
 # Regex (case-insensitive) a borrar del título al limpiar
 cleanup_patterns:
-  - "\(official video\)"
-  - "\(official music video\)"
-  - "\(official\)"
-  - "\(lyric(?:s)? video\)"
-  - "\(lyric(?:s)?\)"
-  - "\(lyrics?\)"
-  - "\(hd\)"
-  - "\bhd\b"
-  - "official video"
-  - "music video"
-  - "\blyrics?\b"
+  - '\(official video\)'
+  - '\(official music video\)'
+  - '\(official\)'
+  - '\(lyric(?:s)? video\)'
+  - '\(lyric(?:s)?\)'
+  - '\(lyrics?\)'
+  - '\(hd\)'
+  - '\bhd\b'
+  - 'official video'
+  - 'music video'
+  - '\blyrics?\b'
 ```
 
 ### Override de metadatos vía `links.txt`
