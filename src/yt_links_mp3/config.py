@@ -7,6 +7,7 @@ from pathlib import Path
 import yaml
 from pydantic import BaseModel, Field
 
+from .cache import default_cache_path
 from .metadata import DEFAULT_CLEANUP_PATTERNS
 
 
@@ -33,17 +34,28 @@ class Config(BaseModel):
     # Patrones regex (case-insensitive) a borrar del título al limpiar
     cleanup_patterns: list[str] = Field(default_factory=lambda: list(DEFAULT_CLEANUP_PATTERNS))
     failed_filename: str = "links.txt.failed"
+    # Cache persistente de metadata. None = sin cache (cada llamada a yt-dlp).
+    # Path por defecto: ~/.cache/yt-links-mp3/metadata.json
+    cache_path: Path | None = None
+    # TTL del cache en segundos. None = sin expiración.
+    # Default: 7 días (604800s) — razonable porque la metadata no cambia seguido.
+    cache_ttl_seconds: float | None = 7 * 24 * 3600
 
     @classmethod
     def load(cls, path: str | Path | None = None) -> Config:
         """Carga config desde YAML. Si no hay path o no existe, devuelve defaults."""
         if path is None:
-            return cls()
+            return cls(cache_path=default_cache_path())
         file_path = Path(path)
         if not file_path.exists():
-            return cls()
+            return cls(cache_path=default_cache_path())
         data = yaml.safe_load(file_path.read_text(encoding="utf-8")) or {}
         # Expandir ~ en output_dir si viene como string
         if "output_dir" in data and isinstance(data["output_dir"], str):
             data["output_dir"] = Path(data["output_dir"]).expanduser()
+        # Cache path: si el YAML no lo define, usar el default del sistema
+        if "cache_path" not in data or data["cache_path"] is None:
+            data["cache_path"] = default_cache_path()
+        elif isinstance(data["cache_path"], str):
+            data["cache_path"] = Path(data["cache_path"]).expanduser()
         return cls(**data)

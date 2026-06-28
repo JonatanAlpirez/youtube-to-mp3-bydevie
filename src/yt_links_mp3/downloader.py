@@ -14,6 +14,7 @@ from yt_dlp.utils import (
     UnavailableVideoError,
 )
 
+from .cache import MetadataCache, extract_video_id
 from .config import Config
 from .linklist import LinkEntry
 from .metadata import TrackMetadata, build_metadata
@@ -284,3 +285,38 @@ def fetch_metadata(url: str) -> dict:
     }
     with YoutubeDL(opts) as ydl:
         return ydl.extract_info(url, download=False)
+
+
+def fetch_metadata_cached(
+    url: str,
+    cache: MetadataCache | None = None,
+) -> dict:
+    """fetch_metadata con cache opcional por video_id.
+
+    Si `cache` es None, hace una llamada directa a yt-dlp (sin cache).
+    Si hay cache, primero busca por video_id; si está (y no expiró), devuelve
+    eso. Si no, llama a yt-dlp y guarda el resultado.
+    """
+    if cache is None:
+        return fetch_metadata(url)
+
+    video_id = extract_video_id(url)
+    cached = cache.get(video_id)
+    if cached is not None:
+        logger.debug(f"Cache hit para {video_id}")
+        return cached
+
+    info = fetch_metadata(url)
+    # Preferir el ID que devolvió yt-dlp sobre el extraído de la URL
+    final_id = info.get("id") or video_id
+    cache.set(final_id, info)
+    logger.debug(f"Cache miss para {final_id}, guardado")
+    return info
+
+
+def build_cache(config: Config) -> MetadataCache | None:
+    """Construye el cache desde Config. Devuelve None si cache_path es None."""
+    if config.cache_path is None:
+        return None
+    path = Path(config.cache_path) if not isinstance(config.cache_path, Path) else config.cache_path
+    return MetadataCache(path=path, ttl_seconds=config.cache_ttl_seconds)

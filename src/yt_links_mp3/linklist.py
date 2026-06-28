@@ -2,6 +2,12 @@
 
 Tolera comentarios (# y //), líneas vacías, IDs solos, dedupe preservando orden
 y descripción opcional después de la URL.
+
+Sitios soportados:
+  - YouTube: URLs completas (youtube.com/watch?v=ID, youtu.be/ID, /shorts/ID)
+             o ID solo de 11 chars.
+  - Otros sitios soportados por yt-dlp (SoundCloud, Bandcamp, Vimeo, etc.):
+    cualquier URL http(s)://. Se descarga vía el extractor correspondiente.
 """
 
 from __future__ import annotations
@@ -15,13 +21,21 @@ _YT_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
 
 # URL completa de YouTube
 _FULL_URL_RE = re.compile(
-    r"https?://(?:www\.|m\.)?(?:youtube\.com/watch\?v=|youtu\.be/)([A-Za-z0-9_-]{11})"
+    r"https?://(?:www\.|m\.)?(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/shorts/)([A-Za-z0-9_-]{11})"
 )
+
+# Cualquier URL http(s):// — para sitios no-YouTube (SoundCloud, Bandcamp, Vimeo, etc.)
+_GENERIC_URL_RE = re.compile(r"^https?://\S+$")
 
 
 @dataclass(frozen=True)
 class LinkEntry:
-    """Una entrada parseada del archivo de links."""
+    """Una entrada parseada del archivo de links.
+
+    `video_id` es el identificador natural del video:
+      - YouTube: el video_id de 11 chars.
+      - Otros sitios: la URL completa (porque no hay ID corto universal).
+    """
 
     video_id: str
     url: str
@@ -47,11 +61,22 @@ class ParseResult:
 
 
 def _extract_video_id(token: str) -> str | None:
-    """Extrae el video_id de un token. Acepta URL completa, youtu.be, o ID solo."""
+    """Extrae el video_id de un token.
+
+    Acepta:
+      - URL completa de YouTube → devuelve el video_id de 11 chars
+      - ID solo de YouTube (11 chars) → lo devuelve tal cual
+      - URL genérica http(s):// (SoundCloud, Bandcamp, etc.) → devuelve la URL
+        completa como identificador
+    """
     m = _FULL_URL_RE.search(token)
     if m:
         return m.group(1)
     if _YT_ID_RE.match(token):
+        return token
+    if _GENERIC_URL_RE.match(token):
+        # Para sitios no-YouTube, usamos la URL como identificador de dedupe.
+        # yt-dlp determina el extractor por la URL al momento de descargar.
         return token
     return None
 
@@ -83,8 +108,9 @@ def parse_link_file(path: str | Path) -> ParseResult:
     Reglas:
       - Línea vacía o solo whitespace: ignorada
       - Línea que empieza con # o //: ignorada (comentario)
-      - URLs completas o youtu.be/<id>: aceptadas
-      - IDs solos de 11 chars: aceptados, normalizados a https://youtu.be/<id>
+      - URLs completas de YouTube o youtu.be/<id>: aceptadas, normalizadas a https://youtu.be/<id>
+      - URLs genéricas http(s):// (SoundCloud, Bandcamp, Vimeo, etc.): aceptadas tal cual
+      - IDs solos de 11 chars (YouTube): aceptados, normalizados a https://youtu.be/<id>
       - Texto después de la URL/ID: se guarda como descripción
       - Duplicados: deduplicados preservando primera aparición
       - Encoding: UTF-8 estricto, BOM tolerado
@@ -117,7 +143,11 @@ def parse_link_file(path: str | Path) -> ParseResult:
             continue
 
         seen_ids[video_id] = line_number
-        url = f"https://youtu.be/{video_id}"
+        # Para YouTube, normalizamos a youtu.be/<id>. Para otros sitios, usamos la URL.
+        if video_id == stripped.split()[0] and _YT_ID_RE.match(video_id):
+            url = f"https://youtu.be/{video_id}"
+        else:
+            url = video_id  # URL completa para sitios no-YouTube
         entries.append(
             LinkEntry(
                 video_id=video_id,

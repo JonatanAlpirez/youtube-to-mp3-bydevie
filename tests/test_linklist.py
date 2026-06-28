@@ -88,5 +88,83 @@ jNQXAC9IVRw
         assert ids == ["AAAAAAAAAAA", "BBBBBBBBBBB", "CCCCCCCCCCC"]
 
 
+class TestParseNonYoutubeSites:
+    """Tests para URLs de sitios no-YouTube (SoundCloud, Bandcamp, Vimeo, etc.)."""
+
+    def test_soundcloud_url_accepted(self, tmp_path: Path) -> None:
+        f = tmp_path / "links.txt"
+        f.write_text("https://soundcloud.com/artist/track-name\n", encoding="utf-8")
+        result = parse_link_file(f)
+        assert result.total == 1
+        e = result.entries[0]
+        # Para sitios no-YouTube, video_id == url
+        assert e.video_id == "https://soundcloud.com/artist/track-name"
+        assert e.url == "https://soundcloud.com/artist/track-name"
+
+    def test_bandcamp_url_accepted(self, tmp_path: Path) -> None:
+        f = tmp_path / "links.txt"
+        f.write_text("https://artist.bandcamp.com/track/song\n", encoding="utf-8")
+        result = parse_link_file(f)
+        assert result.total == 1
+        assert result.entries[0].video_id == "https://artist.bandcamp.com/track/song"
+
+    def test_vimeo_url_accepted(self, tmp_path: Path) -> None:
+        f = tmp_path / "links.txt"
+        f.write_text("https://vimeo.com/123456789\n", encoding="utf-8")
+        result = parse_link_file(f)
+        assert result.total == 1
+        assert result.entries[0].video_id == "https://vimeo.com/123456789"
+
+    def test_mixed_youtube_and_others(self, tmp_path: Path) -> None:
+        f = tmp_path / "links.txt"
+        f.write_text(
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ\n"
+            "https://soundcloud.com/artist/track\n"
+            "https://bandcamp.com/track/123\n",
+            encoding="utf-8",
+        )
+        result = parse_link_file(f)
+        assert result.total == 3
+        ids = [e.video_id for e in result.entries]
+        assert ids[0] == "dQw4w9WgXcQ"
+        assert ids[1] == "https://soundcloud.com/artist/track"
+        assert ids[2] == "https://bandcamp.com/track/123"
+
+    def test_dedupe_non_youtube_urls(self, tmp_path: Path) -> None:
+        """URLs no-YouTube duplicadas se deduplican por igualdad de string."""
+        f = tmp_path / "links.txt"
+        f.write_text(
+            "https://soundcloud.com/artist/track\nhttps://soundcloud.com/artist/track\n",
+            encoding="utf-8",
+        )
+        result = parse_link_file(f)
+        assert result.total == 1
+        assert len(result.skipped) == 1
+        assert "duplicado" in result.skipped[0][2]
+
+    def test_youtube_shorts_url(self, tmp_path: Path) -> None:
+        f = tmp_path / "links.txt"
+        f.write_text("https://www.youtube.com/shorts/dQw4w9WgXcQ\n", encoding="utf-8")
+        result = parse_link_file(f)
+        assert result.total == 1
+        assert result.entries[0].video_id == "dQw4w9WgXcQ"
+
+    def test_non_youtube_with_description(self, tmp_path: Path) -> None:
+        f = tmp_path / "links.txt"
+        f.write_text("https://soundcloud.com/artist/track  My favorite\n", encoding="utf-8")
+        result = parse_link_file(f)
+        assert result.total == 1
+        assert result.entries[0].description == "My favorite"
+
+    def test_non_url_text_still_rejected(self, tmp_path: Path) -> None:
+        """Texto plano sin http:// sigue siendo rechazado."""
+        f = tmp_path / "links.txt"
+        f.write_text("just some random text\n", encoding="utf-8")
+        result = parse_link_file(f)
+        assert result.total == 0
+        assert len(result.skipped) == 1
+        assert "válido" in result.skipped[0][2]
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

@@ -52,3 +52,12 @@ cleanup_patterns:
 # Archivo de links fallidos (auto-generado cuando algo falla)
 # Útil para reintentar: yt-links-mp3 download links.txt.failed
 failed_filename: "links.txt.failed"
+
+# Cache persistente de metadata. Acelera corridas cuando un mismo video_id
+# aparece en varios archivos de links, o en varias corridas del mismo archivo.
+# Path por defecto: $XDG_CACHE_HOME/yt-links-mp3/metadata.json
+# (~/.cache/yt-links-mp3/metadata.json si XDG_CACHE_HOME no está definido)
+# Para desactivar el cache, comentá la línea (null).
+#cache_path: ~/.cache/yt-links-mp3/metadata.json
+# TTL en segundos. None o 0 = sin expiración. Default: 7 días.
+cache_ttl_seconds: 604800

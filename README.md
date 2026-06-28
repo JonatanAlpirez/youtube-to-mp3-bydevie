@@ -8,14 +8,19 @@ Descargador de música desde YouTube a partir de un **archivo de texto con URLs*
 
 ## ✨ Características
 
-- Lee un archivo de texto con URLs de videos individuales de YouTube (uno por línea).
+- Lee un archivo de texto con URLs de videos (uno por línea) — soporta YouTube y sitios compatibles con `yt-dlp` (SoundCloud, Bandcamp, Vimeo, etc.).
 - Parser tolerante: comentarios (`#`, `//`), líneas vacías, IDs solos (`dQw4w9WgXcQ`), dedupe automático.
 - Convierte cada video a MP3 con `yt-dlp` + `ffmpeg` a 320 kbps (CBR) por defecto.
+- Metadata limpia automáticamente: regex borra `Official Video`, `HD`, `(Lyric)`, etc.
+- Portada embebida en cada MP3 (ID3v2.4 cover art) — sin archivos sueltos.
 - Modo dry-run para previsualizar sin escribir a disco.
 - Auto-reanudación: si un link falla, se escribe a `links.txt.failed` para reintentar.
 - Reintentos automáticos con backoff exponencial (1s, 5s, 15s por defecto) en errores de red. Errores permanentes (video privado, eliminado, 404, age-restricted) no se reintentan.
 - Concurrencia configurable (default: 3 workers en paralelo).
+- Cache persistente de metadata: evita llamadas repetidas a `yt-dlp` cuando el mismo video aparece en varios archivos.
+- Comando `info` para ver metadata de un link o archivo sin descargar.
 - Configuración por archivo YAML.
+- Empaquetable con `pipx` para uso como comando global.
 
 Roadmap y features pendientes: ver [`PLAN.md`](./PLAN.md).
 
@@ -27,7 +32,7 @@ Roadmap y features pendientes: ver [`PLAN.md`](./PLAN.md).
 | --------------------- | ----------------------------------------- | ----------------------------------------------------------------------- |
 | Descarga de video     | [`yt-dlp`](https://github.com/yt-dlp/yt-dlp) | Mantenido, soporte de URLs individuales, selectores de formato, postprocesado. |
 | Extracción de audio   | `ffmpeg`                                  | Estándar de facto para muxing/conversión.                               |
-| Lenguaje              | Python 3.9+ (probado en 3.11; 3.9 deprecado por yt-dlp) | Ecosistema, scripts, CLI limpio. |
+| Lenguaje              | Python 3.10+ (probado en 3.11 y 3.12 en CI) | Ecosistema, scripts, CLI limpio. |
 | CLI                   | [`click`](https://palletsprojects.com/p/click/) | Argumentos tipados, subcomandos, experiencia pro.                     |
 | Config                | `pydantic` + YAML                        | Validación + archivo de config legible.                                |
 | Logging               | `loguru`                                  | Salida colorida en consola + archivo rotado.                            |
@@ -96,9 +101,34 @@ pip install -e .
 
 > El comando `yt-links-mp3` quedará disponible en tu shell mientras el venv esté activado. En Windows también funciona desde PowerShell y CMD.
 
+#### Instalación global con `pipx` (recomendado para uso personal)
+
+Si solo querés usar el CLI sin desarrollar, `pipx` lo instala en un venv aislado y expone el comando globalmente:
+
+```bash
+# macOS / Linux
+brew install pipx          # o: python3 -m pip install --user pipx
+pipx ensurepath
+
+# Instalar desde el repo local
+pipx install .
+
+# O desde GitHub directo (sin clonar)
+pipx install git+https://github.com/JonatanAlpirez/yt-links-mp3.git
+```
+
+Después podés invocar `yt-links-mp3` desde cualquier directorio:
+
+```bash
+yt-links-mp3 download ~/Music/links.txt
+yt-links-mp3 info dQw4w9WgXcQ
+```
+
+> Requisito: Python 3.10+ en el sistema (lo declara el `pyproject.toml`).
+
 ### 3. Requisitos de Python
 
-Probado en Python 3.11. `pyproject.toml` declara `>=3.9` pero yt-dlp deprecó 3.9.
+Probado en Python 3.11 y 3.12. `pyproject.toml` declara `>=3.10`.
 
 | SO | Instalar Python 3.11+ |
 | --- | --- |
@@ -279,7 +309,7 @@ pytest                              # corre todos los tests
 pytest tests/test_linklist.py -v    # solo el parser de links
 ```
 
-Estado actual: **101/101 tests pasando** (`test_linklist.py` parser, `test_metadata.py` limpieza y extracción, `test_paths.py` sanitización y naming, `test_config.py` carga de YAML, `test_downloader.py` retry y concurrencia, `test_cli.py` comando info y helpers).
+Estado actual: **125/125 tests pasando** (`test_linklist.py` parser YouTube + sitios múltiples, `test_metadata.py` limpieza y extracción, `test_paths.py` sanitización y naming, `test_config.py` carga de YAML, `test_downloader.py` retry y concurrencia, `test_cli.py` comando info y helpers, `test_cache.py` cache persistente).
 
 ## 🔧 Makefile
 
@@ -307,6 +337,50 @@ yt-links-mp3 info ~/Music/links.txt
 ```
 
 Muestra título, artista, duración y si ya está descargado, sin tocar disco.
+
+## 💾 Cache de metadata
+
+Para evitar llamadas repetidas a YouTube (lento, rate-limited), `yt-links-mp3` cachea la metadata por `video_id` en:
+
+- `$XDG_CACHE_HOME/yt-links-mp3/metadata.json` (si la variable está definida)
+- `~/.cache/yt-links-mp3/metadata.json` (si no)
+
+**TTL por defecto:** 7 días. Para modificarlo, editá `config.yaml`:
+
+```yaml
+cache_path: ~/.cache/yt-links-mp3/metadata.json
+cache_ttl_seconds: 604800   # 7 días. 0 o null = sin expiración.
+```
+
+> El cache se aplica en `info` y en `download` (cuando vuelve a fetchear metadata de un link conocido). La primera corrida llena el cache; las siguientes son instantáneas.
+
+## 🌐 Sitios soportados
+
+El parser y el downloader son agnósticos del sitio — usan `yt-dlp`, que soporta [más de 1500 sitios](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md). Algunos comunes:
+
+| Sitio | Soporte | Notas |
+|-------|---------|-------|
+| YouTube | ✅ | Sitio primario. URLs `youtube.com/watch?v=ID`, `youtu.be/ID`, `/shorts/ID`, o ID solo. |
+| SoundCloud | ✅ | Cualquier URL de track público. |
+| Bandcamp | ✅ | URLs `artist.bandcamp.com/track/...`. |
+| Vimeo | ✅ | URLs `vimeo.com/<id>`. |
+| Cualquier URL `http(s)://` | ✅ | Se intenta con el extractor correspondiente de yt-dlp. |
+
+Ejemplo de archivo mixto:
+
+```text
+# YouTube
+https://www.youtube.com/watch?v=dQw4w9WgXcQ
+dQw4w9WgXcQ                              # ID solo
+https://youtu.be/jNQXAC9IVRw             # URL corta
+https://www.youtube.com/shorts/abc12345678
+
+# Otros sitios
+https://soundcloud.com/artist/track-name
+https://artist.bandcamp.com/track/song
+```
+
+> Las URLs no-YouTube no se deduplican por video_id (porque no hay uno corto universal) — se deduplican por URL completa.
 
 ---
 

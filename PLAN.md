@@ -118,109 +118,77 @@ https://www.youtube.com/watch?v=4xDzrJKXOOY   Boiler Room (mezcla 1h)
 
 ## 📅 Fases
 
-### Fase 0 — Bootstrap (1h)
-- [x] Crear repo con `README.md` y `PLAN.md`
-- [x] `git init`, branch `main`, `.gitignore` para Python
-- [x] Renombrar proyecto a `yt-links-mp3` (paquete y CLI)
-- [x] `pyproject.toml` con deps: `yt-dlp`, `click`, `pydantic`, `pyyaml`, `loguru`, `rich`
-- [x] Estructura de carpetas `src/` y `tests/`
-- [x] `config.example.yaml` y `links.example.txt`
-- [x] Repo remoto en GitHub
-- [x] Virtualenv creado (Python 3.11 disponible vía Homebrew)
-- [x] Paquete instalable: `pip install -e .` deja `yt-links-mp3` disponible en PATH
+### Fase 0 — Bootstrap ✅
 
-### Fase 1 — MVP funcional (4–6h)
-- [x] `linklist.py`: parser del archivo de links (comentarios, vacíos, IDs solos, dedupe)
-- [x] `cli.py` con comando `download <archivo.txt>` que toma el archivo como argumento
-- [x] `cli.py` con comando `validate <archivo.txt>` que muestra cuántos links válidos hay sin descargar
-- [x] `downloader.py`: por cada URL, usa `yt-dlp` para descargar `bestaudio` y convertir a MP3 con `ffmpeg` postprocess
-- [x] `paths.py`: sanitiza nombres de archivo (caracteres prohibidos, longitud máxima)
-- [x] `progress.py`: barra de progreso global con `rich`
-- [x] Logging a consola con `loguru`
-- [ ] Salida por defecto: `~/Music/Downloads/<Artist>/<Album>/NN - Title.mp3` *(queda Fase 2: hoy sale plano como `~/Music/Downloads/<id>.mp3`)*
+- Repo con `README.md`, `PLAN.md`, `.gitignore` para Python
+- Branch `main`, repo remoto en GitHub
+- Proyecto renombrado a `yt-links-mp3` (paquete y CLI)
+- `pyproject.toml` con deps: `yt-dlp`, `click`, `pydantic`, `pyyaml`, `loguru`, `rich`
+- Estructura `src/` + `tests/`
+- `config.example.yaml` y `links.example.txt`
+- Virtualenv con Python 3.11 (vía Homebrew)
+- Paquete instalable: `pip install -e .` deja `yt-links-mp3` en PATH
 
-**Criterio de aceptación:** dado un `links.txt` con 10 URLs de videos individuales, produce 10 MP3s válidos en menos de 5 minutos.
+### Fase 1 — MVP funcional ✅
 
-#### Decisiones de implementación de Fase 1
-- **Descargas en serie por ahora** (en `cli.py`). `downloader.download_all()` ya existe con `ThreadPoolExecutor`, pero `cli.download` itera secuencial para mantener la barra de progreso exacta. Migración a paralelo con callback de progress queda para Fase 3.
-- **Outputs flat por ahora**: yt-dlp escribe `<id>.mp3` en `output_dir` (no estructura por artista/álbum aún).
-- **Sanitización ya implementada** (`paths.sanitize_component`) pero no aplicada a outputs en Fase 1 (Fase 2).
-- **9/9 tests pasando** en `tests/test_linklist.py`.
+- `linklist.py`: parser del archivo de links (comentarios, vacíos, IDs solos, dedupe)
+- `cli.py` con comando `download <archivo.txt>`
+- `cli.py` con comando `validate <archivo.txt>` (preflight sin descargar)
+- `downloader.py`: usa `yt-dlp` para `bestaudio` + convierte a MP3 con `ffmpeg`
+- `paths.py`: sanitización de nombres
+- `progress.py`: barra de progreso global con `rich`
+- Logging a consola con `loguru`
 
-### Fase 2 — Metadatos ricos (3–4h)
-- [ ] `metadata.py`: extraer artista/título/álbum de la descripción/título del video con heurísticas
-### Fase 2 — Metadatos y naming (3–4h)
+### Fase 2 — Metadatos y naming ✅
 
-**Objetivo:** que cada MP3 tenga metadatos limpios, portada embebida, y nombre consistente `{NN} - {artist} - {title}.mp3`.
+**Objetivo:** MP3s con metadatos limpios, portada embebida, nombre consistente `{NN} - {artist} - {title}.mp3`.
 
 **Decisiones de diseño cerradas:**
 
 | # | Decisión | Detalle |
 |---|----------|---------|
-| 1 | **Estructura de carpetas** | Flat. Todos los MP3s en `output_dir` (no subcarpetas por artista/álbum). |
-| 2 | **Template de nombre** | `{track_number:02d} - {artist} - {title}.mp3`. Configurable vía `filename_template` en YAML. |
-| 3 | **Track number** | Si YouTube provee track number en playlist, usarlo. Si no, asignar incrementalmente 01, 02, 03… según orden de aparición en `links.txt`. |
-| 4 | **Limpieza de metadatos** | Regex case-insensitive sobre el título: borrar `Official Video`, `HD`, `(Lyric)`. Extensible vía lista en config. |
-| 5 | **Portada** | Emebebida en el MP3 (ID3v2.4 cover art). Sin archivo `cover.jpg` separado. Usar `maxresdefault` si existe, fallback a `hqdefault`. |
-| 6 | **Metadatos faltantes** | Artista ausente → `"Unknown Artist"`. Título ausente → título original sin limpiar, o `video_id` como último fallback. |
-| 7 | **Hint manual** | Descripción en `links.txt` (texto después de la URL) puede sobreescribir artista/título si está presente. |
-| 8 | **Skip existing** | Si `{template}.mp3` ya existe en `output_dir`, skip. `--force` ignora el skip. |
+| 1 | **Estructura de carpetas** | Flat. Todos los MP3s en `output_dir` (sin subcarpetas). |
+| 2 | **Template de nombre** | `{track_number:02d} - {artist} - {title}.mp3`. Configurable vía `filename_template`. |
+| 3 | **Track number** | Incremental 01, 02, 03… según orden en `links.txt`. |
+| 4 | **Limpieza de metadatos** | Regex case-insensitive: borrar `Official Video`, `HD`, `(Lyric)`. Configurable. |
+| 5 | **Portada** | Embedida en el MP3 (ID3v2.4 cover art). `maxresdefault` con fallback a `hqdefault`. |
+| 6 | **Metadatos faltantes** | Artista ausente → `"Unknown Artist"`. Título ausente → título original o `video_id`. |
+| 7 | **Hint manual** | Descripción en `links.txt` puede sobreescribir artista/título (`Artist - Title` o `Artist/Title`). |
+| 8 | **Skip existing** | Si `{template}.mp3` ya existe, skip. `--force` ignora. |
 
 **Implementación:**
 
-- [ ] Nuevo módulo `metadata.py`: extracción desde yt-dlp + limpieza regex + sanitización
-- [ ] `paths.py`: función `build_filename(template, metadata)` para componer el nombre final
-- [ ] `downloader.py`: usar metadata para nombrar el output + skip existing
-- [ ] Embeber metadata + cover con `ffmpeg` postprocess (ya integrado con yt-dlp)
-- [ ] `tests/test_metadata.py`: cubrir regex de limpieza y casos de fallback
-- [ ] Actualizar `config.example.yaml` con `filename_template` y `cleanup_patterns`
-- [ ] Actualizar `README.md` con nueva estructura y naming
+- Módulo `metadata.py`: extracción desde yt-dlp + limpieza regex + sanitización
+- `paths.py`: `build_filename(template, metadata)` compone el nombre final
+- `downloader.py`: usa metadata para nombrar output + skip existing + cover embed
+- `tests/test_metadata.py`: cubre regex y casos de fallback
 
-**Criterio de aceptación:** dado un `links.txt` con 5 URLs, produce 5 MP3s nombrados `01 - Artist - Title.mp3`, `02 - …`, etc., con metadatos ID3 visibles en Finder/VLC, portada embebida, y títulos limpios (sin "Official Video"). Una segunda corrida con el mismo `links.txt` no re-descarga nada (skip por nombre).
+### Fase 3 — Robustez ✅
 
-### Fase 3 — Robustez (2–3h)
+- Reintentos: 3 intentos con backoff exponencial (1s, 5s, 15s) en errores transitorios. Errores permanentes (404, privado, eliminado, age-restricted) NO se reintentan.
+- Concurrencia real: `download_all()` usa `ThreadPoolExecutor` con `config.concurrency` workers
+- `--concurrency N` funciona end-to-end (default: 3)
+- Resumen final: N exitosos, M skip, K fallidos, R requirieron retry. Escribe `links.txt.failed` si hay fallos
+- Comando `info <link|archivo>` para ver metadata sin descargar
 
-- [x] Reintentos: 3 intentos con backoff exponencial (1s, 5s, 15s por defecto) en errores transitorios (network, 5xx). No reintentar en errores permanentes (404, privado, eliminado, age-restricted).
-- [x] Concurrencia real: `download_all()` usa `ThreadPoolExecutor` con `config.concurrency` workers. CLI usa `download_all()` en lugar de loop secuencial.
-- [x] `--concurrency N` funciona end-to-end (default: 3).
-- [x] Resumen final: N exitosos, M skip, K fallidos, R requirieron retry. Escribe `links.txt.failed` si hay fallos.
-- [x] Sugerencia al usuario: `yt-links-mp3 download links.txt.failed`.
+### Fase 4 — Calidad y DX ✅
 
-**Criterio de aceptación:** un archivo con 50 links, 2 privados y 1 roto, termina con 47 archivos descargados, 0 skip, 3 en `links.txt.failed`. Errores permanentes (privado) NO se reintentan — fallan al primer intento. Reintentá los fallidos con `yt-links-mp3 download links.txt.failed`. Una corrida posterior sobre el mismo `links.txt` muestra los 47 como skip.
+- 101 tests unitarios pasando: `linklist.py` (9), `metadata.py` (36), `paths.py` (18), `config.py` (5), `downloader.py` (18), `cli.py` (15)
+- `pre-commit` con `ruff` lint + format (`.pre-commit-config.yaml`)
+- CI con GitHub Actions: lint + tests en matrix Python 3.11/3.12
+- `Makefile` con targets: `install`, `test`, `lint`, `lint-fix`, `format`, `run`, `clean`
+- `ruff check .` y `ruff format --check .` pasan limpios
 
-### Fase 4 — Calidad y DX (2–3h)
+### Fase 5 — Pulido (en progreso)
 
-- [x] Tests unitarios: cobertura completa en `linklist.py` (9), `metadata.py` (36), `paths.py` (18), `config.py` (5), `downloader.py` (18), `cli.py` (15) — total 101/101 pasando.
-- [x] `pre-commit` con `ruff` (`.pre-commit-config.yaml`)
-- [x] CI con GitHub Actions: lint + tests en matrix Python 3.11/3.12 (`.github/workflows/tests.yml`)
-- [x] `Makefile` con targets: `install`, `test`, `lint`, `lint-fix`, `format`, `run`, `clean`
-- [x] Comando `info <link>` que muestra metadata de un video sin descargar
-- [x] Comando `info <archivo.txt>` que muestra tabla resumen (título, artista detectado, duración, ya descargado sí/no)
-- [x] `ruff check .` y `ruff format --check .` pasan limpios
-
-### Fase 5 — Pulido (opcional)
-
-- [ ] Watch mode: si modificás `links.txt`, descarga los nuevos
 - [ ] Cache de metadatos para evitar refetch
-- [ ] Integración con `beets` o `MusicBrainz` para arreglar metadatos
 - [ ] Soporte para SoundCloud, Bandcamp (vía yt-dlp)
-- [ ] Empaquetado para `brew tap` o `pipx`
+- [ ] Empaquetado para `pipx`
 
-### Fase 4 — Calidad y DX (2–3h)
-- [ ] Tests unitarios para `linklist.py`, `paths.py`, `metadata.py`, `config.py`
-- [ ] `pre-commit` con `ruff` + `black`
-- [ ] CI con GitHub Actions (lint + tests en matrix Python 3.11/3.12)
-- [ ] `Makefile` con targets: `install`, `test`, `lint`, `run`
-- [ ] Comando `info <link>` que muestra metadata de un video sin descargar
-- [ ] Comando `info <archivo.txt>` que muestra tabla resumen (título, artista detectado, duración, ya descargado sí/no)
+### Fase 6 — Futuras ideas
 
-### Fase 5 — Pulido (opcional)
-- [ ] Watch mode: si modificás `links.txt`, descarga los nuevos
-- [ ] Cache de metadatos para evitar refetch
-- [ ] Integración con `beets` o `MusicBrainz` para arreglar metadatos
+- [ ] Integración con MusicBrainz para mejorar la calidad de metadatos (artista, álbum, año, carátula de release oficial)
 - [ ] Auto-organizar en estructura `{artist}/{year - album}/` si hay año disponible
-- [ ] Soporte para SoundCloud, Bandcamp (vía yt-dlp)
-- [ ] Empaquetado para `brew tap` o `pipx`
 
 ---
 
@@ -303,24 +271,12 @@ yt-links-mp3 download ~/Music/links.txt.failed  # reintenta esos
 
 ## 🚦 Estado actual
 
-**Fase:** 4 — Calidad y DX ✅ (101 tests, ruff + pre-commit + CI, Makefile, comando `info`)
-**Próximo paso:** Fase 5 — Pulido (watch mode, MusicBrainz, otros sitios vía yt-dlp)
-
-### Lo que funciona hoy
-- `yt-links-mp3 validate <archivo.txt>` → cuenta links válidos y reporta líneas ignoradas
-- `yt-links-mp3 download <archivo.txt>` → descarga secuencial con barra de progreso, log de fallos, y genera `links.txt.failed` para reintentar
-- `yt-links-mp3 download --dry-run` → preview sin tocar disco
-- `yt-links-mp3 download --concurrency N` → *override disponible pero no aplicado (loop secuencial en cli)*
-- Outputs en `~/Music/Downloads/<NN> - <artist> - <title>.mp3` (flat, con naming por metadata)
-- Calidad por defecto: 320 kbps (CBR, máximo para MP3)
-- Portada embebida en cada MP3 (ID3v2.4 cover art)
-- Títulos limpios automáticamente (regex borra `Official Video`, `HD`, `(Lyric)`, etc.)
-- Skip automático: si el archivo final ya existe, no se re-descarga. `--force` para ignorar skip.
-- Override de metadatos vía hint en `links.txt` (formato `Artist - Title` o `Artist/Title`)
-- Tests: 101/101 pasando
+**Fase actual:** 5 — Pulido ✅ (cache + sitios múltiples + pipx)
+**Próximo paso:** Fase 6 (MusicBrainz, estructura por artista/álbum)
 
 ### Notas operativas
-- **Python 3.11 disponible** vía Homebrew (`/opt/homebrew/bin/python3.11`). `pyproject.toml` declara `>=3.9`.
-- **ffmpeg** requerido por yt-dlp para el postprocess a MP3.
+
+- Python 3.10+ requerido (`pyproject.toml` declara `>=3.10`). Probado en 3.11 y 3.12.
+- ffmpeg requerido por yt-dlp para el postprocess a MP3.
 
 ---

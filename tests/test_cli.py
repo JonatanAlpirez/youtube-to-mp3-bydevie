@@ -69,7 +69,7 @@ def test_info_single_url_shows_metadata() -> None:
         "duration": 213,
     }
     runner = CliRunner()
-    with patch("yt_links_mp3.downloader.fetch_metadata", return_value=fake_info):
+    with patch("yt_links_mp3.downloader.fetch_metadata_cached", return_value=fake_info):
         result = runner.invoke(
             main,
             ["info", "https://www.youtube.com/watch?v=dQw4w9WgXcQ"],
@@ -89,7 +89,7 @@ def test_info_bare_id_works() -> None:
         "duration": 100,
     }
     runner = CliRunner()
-    with patch("yt_links_mp3.downloader.fetch_metadata", return_value=fake_info):
+    with patch("yt_links_mp3.downloader.fetch_metadata_cached", return_value=fake_info):
         result = runner.invoke(main, ["info", "dQw4w9WgXcQ"])
     assert result.exit_code == 0
     assert "Test Song" in result.output
@@ -99,7 +99,7 @@ def test_info_url_not_found_fails() -> None:
     """info con URL que falla muestra error y aborta."""
     runner = CliRunner()
     with patch(
-        "yt_links_mp3.downloader.fetch_metadata",
+        "yt_links_mp3.downloader.fetch_metadata_cached",
         side_effect=Exception("Video unavailable"),
     ):
         result = runner.invoke(main, ["info", "https://youtu.be/nonexistent1"])
@@ -114,7 +114,7 @@ def test_info_file_shows_table(tmp_path: Path) -> None:
     links_file = tmp_path / "links.txt"
     links_file.write_text("https://youtu.be/dQw4w9WgXcQ\nhttps://youtu.be/jNQXAC9IVRw\n")
 
-    def fake_fetch(url):
+    def fake_fetch(url, **_kwargs):
         return {
             "id": url.split("/")[-1],
             "title": f"Song {url[-11:]}",
@@ -123,7 +123,7 @@ def test_info_file_shows_table(tmp_path: Path) -> None:
         }
 
     runner = CliRunner()
-    with patch("yt_links_mp3.downloader.fetch_metadata", side_effect=fake_fetch):
+    with patch("yt_links_mp3.downloader.fetch_metadata_cached", side_effect=fake_fetch):
         result = runner.invoke(main, ["info", str(links_file)])
     assert result.exit_code == 0
     assert "Some Artist" in result.output
@@ -143,11 +143,11 @@ def test_info_file_with_skipped_lines(tmp_path: Path) -> None:
     links_file = tmp_path / "links.txt"
     links_file.write_text("# comentario\n\nhttps://youtu.be/dQw4w9WgXcQ\nno es un link\n")
 
-    def fake_fetch(url):
+    def fake_fetch(url, **_kwargs):
         return {"id": "abc", "title": "T", "uploader": "A", "duration": 100}
 
     runner = CliRunner()
-    with patch("yt_links_mp3.downloader.fetch_metadata", side_effect=fake_fetch):
+    with patch("yt_links_mp3.downloader.fetch_metadata_cached", side_effect=fake_fetch):
         result = runner.invoke(main, ["info", str(links_file)])
     assert result.exit_code == 0
     # La línea inválida se reporta como skipped
@@ -159,13 +159,13 @@ def test_info_file_one_link_fails_other_succeeds(tmp_path: Path) -> None:
     links_file = tmp_path / "links.txt"
     links_file.write_text("https://youtu.be/dQw4w9WgXcQ\nhttps://youtu.be/failvideoid\n")
 
-    def fake_fetch(url):
+    def fake_fetch(url, **_kwargs):
         if "fail" in url:
             raise Exception("Video unavailable")
         return {"id": "ok", "title": "OK Song", "uploader": "OK", "duration": 100}
 
     runner = CliRunner()
-    with patch("yt_links_mp3.downloader.fetch_metadata", side_effect=fake_fetch):
+    with patch("yt_links_mp3.downloader.fetch_metadata_cached", side_effect=fake_fetch):
         result = runner.invoke(main, ["info", str(links_file)])
     assert result.exit_code == 0
     assert "OK Song" in result.output

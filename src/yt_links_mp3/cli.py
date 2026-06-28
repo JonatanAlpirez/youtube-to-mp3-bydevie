@@ -192,12 +192,13 @@ def info(ctx: click.Context, target: str) -> None:
 
     if _is_url_like(target):
         # Una sola URL
-        from .downloader import fetch_metadata
+        from .downloader import build_cache, fetch_metadata_cached
         from .metadata import build_metadata
 
         url = target if "://" in target else f"https://youtu.be/{target}"
+        cache = build_cache(config)
         try:
-            raw_info = fetch_metadata(url)
+            raw_info = fetch_metadata_cached(url, cache=cache)
         except Exception as e:  # noqa: BLE001
             click.echo(f"❌ No pude obtener metadata de {url}: {e}", err=True)
             raise click.Abort() from None  # noqa: B904
@@ -218,7 +219,7 @@ def info(ctx: click.Context, target: str) -> None:
         click.echo()
     else:
         # Archivo de links
-        from .downloader import fetch_metadata
+        from .downloader import build_cache, fetch_metadata_cached
         from .linklist import parse_link_file
 
         path = Path(target)
@@ -233,10 +234,11 @@ def info(ctx: click.Context, target: str) -> None:
             click.echo("No hay links válidos para mostrar")
             return
 
+        cache = build_cache(config)
         rows: list[tuple[str, str, str, str, str]] = []
         for idx, entry in enumerate(result.entries, start=1):
             try:
-                info_dict = fetch_metadata(entry.url)
+                info_dict = fetch_metadata_cached(entry.url, cache=cache)
                 from .metadata import build_metadata
 
                 md = build_metadata(
