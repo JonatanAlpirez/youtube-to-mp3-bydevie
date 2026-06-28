@@ -279,7 +279,34 @@ pytest                              # corre todos los tests
 pytest tests/test_linklist.py -v    # solo el parser de links
 ```
 
-Estado actual: **86/86 tests pasando** (`test_linklist.py` parser, `test_metadata.py` limpieza y extracción, `test_paths.py` sanitización y naming, `test_config.py` carga de YAML, `test_downloader.py` retry y concurrencia).
+Estado actual: **101/101 tests pasando** (`test_linklist.py` parser, `test_metadata.py` limpieza y extracción, `test_paths.py` sanitización y naming, `test_config.py` carga de YAML, `test_downloader.py` retry y concurrencia, `test_cli.py` comando info y helpers).
+
+## 🔧 Makefile
+
+```bash
+make install    # crea venv e instala deps de dev
+make test       # corre pytest
+make lint       # ruff check
+make lint-fix   # ruff check --fix
+make format     # ruff format
+make run ARGS='download links.txt'  # ejecuta el CLI
+make clean      # borra caches
+```
+
+CI con GitHub Actions (`.github/workflows/tests.yml`): lint + tests en matrix Python 3.11/3.12. Pre-commit hooks (`.pre-commit-config.yaml`): ruff lint + format.
+
+## 🔍 Comando `info`
+
+```bash
+# De un solo link (URL completa o ID de 11 chars)
+yt-links-mp3 info "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+yt-links-mp3 info dQw4w9WgXcQ
+
+# De un archivo completo (tabla con todos los links)
+yt-links-mp3 info ~/Music/links.txt
+```
+
+Muestra título, artista, duración y si ya está descargado, sin tocar disco.
 
 ---
 

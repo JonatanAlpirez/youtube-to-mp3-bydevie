@@ -1,4 +1,5 @@
 """CLI entrypoint con click."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -75,8 +76,6 @@ def download(
             logger.info(f"  - {e.url}  ({e.description or 'sin descripción'})")
         return
 
-    from .downloader import download_all
-
     logger.info(f"Descargando con concurrencia={config.concurrency}")
     with progress_bar(result.total, description="Descargando") as progress:
         task_id = progress.tasks[0].id
@@ -128,6 +127,159 @@ def validate(ctx: click.Context, links_file: Path) -> None:
         if len(result.entries) > 10:
             click.echo(f"      ... y {len(result.entries) - 10} más")
     click.echo()
+
+
+def _is_url_like(arg: str) -> bool:
+    """Detecta si un argumento parece URL/ID de YouTube o ruta a archivo."""
+    if "://" in arg or arg.startswith("youtu.be/"):
+        return True
+    # ID solo de 11 chars
+    import re as _re
+
+    if _re.match(r"^[A-Za-z0-9_-]{11}$", arg):
+        return True
+    return False
+
+
+def _format_duration(seconds: int | float | None) -> str:
+    """Formatea segundos a MM:SS."""
+    if not seconds:
+        return "?"
+    s = int(seconds)
+    m, sec = divmod(s, 60)
+    return f"{m}:{sec:02d}"
+
+
+def _existing_path_for(
+    entry_video_id: str,
+    metadata_artist: str,
+    metadata_title: str,
+    track_number: int,
+    config: Config,
+) -> Path | None:
+    """Devuelve el path final esperado si ya existe en disco, si no None."""
+    from yt_links_mp3.metadata import build_metadata
+    from yt_links_mp3.paths import build_filename
+
+    info = {
+        "uploader": metadata_artist,
+        "title": metadata_title,
+    }
+    md = build_metadata(
+        info=info,
+        track_number=track_number,
+        video_id=entry_video_id,
+        cleanup_patterns=config.cleanup_patterns,
+    )
+    md.artist = metadata_artist  # no usar el limpiado, queremos matchear el filename
+    filename = build_filename(config.filename_template, md, ext=config.audio_format)
+    target = config.output_dir / filename
+    return target if target.exists() else None
+
+
+@main.command()
+@click.argument("target")
+@click.pass_context
+def info(ctx: click.Context, target: str) -> None:
+    """Muestra metadata de TARGET sin descargar.
+
+    TARGET puede ser:
+      - Una URL de YouTube (https://...)
+      - Un ID de video de 11 caracteres
+      - Un archivo .txt con múltiples links (mismo formato que download)
+    """
+    config: Config = ctx.obj["config"]
+
+    if _is_url_like(target):
+        # Una sola URL
+        from .downloader import fetch_metadata
+        from .metadata import build_metadata
+
+        url = target if "://" in target else f"https://youtu.be/{target}"
+        try:
+            raw_info = fetch_metadata(url)
+        except Exception as e:  # noqa: BLE001
+            click.echo(f"❌ No pude obtener metadata de {url}: {e}", err=True)
+            raise click.Abort() from None  # noqa: B904
+
+        md = build_metadata(
+            info=raw_info,
+            track_number=1,
+            video_id=raw_info.get("id", "?"),
+            cleanup_patterns=config.cleanup_patterns,
+        )
+
+        click.echo(f"\n🎬 {raw_info.get('title', '?')}")
+        click.echo(f"   Canal:    {raw_info.get('uploader') or raw_info.get('channel') or '?'}")
+        click.echo(f"   Artista:  {md.artist}")
+        click.echo(f"   Titulo:   {md.title}")
+        click.echo(f"   Duracion: {_format_duration(raw_info.get('duration'))}")
+        click.echo(f"   ID:       {raw_info.get('id', '?')}")
+        click.echo()
+    else:
+        # Archivo de links
+        from .downloader import fetch_metadata
+        from .linklist import parse_link_file
+
+        path = Path(target)
+        if not path.exists():
+            click.echo(f"❌ Archivo no encontrado: {path}", err=True)
+            raise click.Abort()
+
+        result = parse_link_file(path)
+        if result.skipped:
+            click.echo(f"⚠️  {len(result.skipped)} líneas ignoradas en {path}")
+        if not result.entries:
+            click.echo("No hay links válidos para mostrar")
+            return
+
+        rows: list[tuple[str, str, str, str, str]] = []
+        for idx, entry in enumerate(result.entries, start=1):
+            try:
+                info_dict = fetch_metadata(entry.url)
+                from .metadata import build_metadata
+
+                md = build_metadata(
+                    info=info_dict,
+                    track_number=idx,
+                    video_id=entry.video_id,
+                    hint=entry.description,
+                    cleanup_patterns=config.cleanup_patterns,
+                )
+                existing = _existing_path_for(entry.video_id, md.artist, md.title, idx, config)
+                downloaded = "✓" if existing else "—"
+                rows.append(
+                    (
+                        str(idx),
+                        md.artist,
+                        md.title,
+                        _format_duration(info_dict.get("duration")),
+                        downloaded,
+                    )
+                )
+            except Exception as e:  # noqa: BLE001
+                rows.append((str(idx), "?", entry.url[:40], "?", f"err: {e}"))
+
+        # Tabla con rich si esta disponible, si no, click.echo simple
+        try:
+            from rich.console import Console
+            from rich.table import Table
+
+            console = Console()
+            table = Table(show_header=True, header_style="bold")
+            table.add_column("#", width=3)
+            table.add_column("Artista", style="cyan")
+            table.add_column("Titulo", style="green")
+            table.add_column("Duracion", justify="right")
+            table.add_column("Descargado", justify="center")
+            for row in rows:
+                table.add_row(*row)
+            console.print(table)
+        except ImportError:
+            click.echo(f"\n{'#':<3} {'Artista':<25} {'Titulo':<40} {'Dur':>6}  Descargado")
+            for row in rows:
+                click.echo(f"{row[0]:<3} {row[1]:<25} {row[2]:<40} {row[3]:>6}  {row[4]}")
+            click.echo()
 
 
 if __name__ == "__main__":

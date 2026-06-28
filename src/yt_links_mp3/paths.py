@@ -1,4 +1,5 @@
 """Sanitización de nombres de archivo y plantillas."""
+
 from __future__ import annotations
 
 import re
@@ -11,7 +12,10 @@ _FORBIDDEN = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
 # Nombres reservados en Windows
 _RESERVED = {
-    "CON", "PRN", "AUX", "NUL",
+    "CON",
+    "PRN",
+    "AUX",
+    "NUL",
     *(f"COM{i}" for i in range(1, 10)),
     *(f"LPT{i}" for i in range(1, 10)),
 }
@@ -48,6 +52,7 @@ def sanitize_template(template: str, context: dict[str, str | int]) -> str:
 
     Soporta formato simple: {key}, {key:0Nd} para zero-padding.
     """
+
     def replace(match: re.Match[str]) -> str:
         token = match.group(1)
         if ":" in token:

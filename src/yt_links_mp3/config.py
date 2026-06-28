@@ -1,4 +1,5 @@
 """Config con pydantic + YAML."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -34,7 +35,7 @@ class Config(BaseModel):
     failed_filename: str = "links.txt.failed"
 
     @classmethod
-    def load(cls, path: str | Path | None = None) -> "Config":
+    def load(cls, path: str | Path | None = None) -> Config:
         """Carga config desde YAML. Si no hay path o no existe, devuelve defaults."""
         if path is None:
             return cls()

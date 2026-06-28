@@ -1,4 +1,5 @@
 """Tests para paths.py — sanitización y construcción de filenames."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -10,7 +11,6 @@ from yt_links_mp3.paths import (
     sanitize_component,
     sanitize_template,
 )
-
 
 # ------------------- sanitize_component -------------------
 
@@ -78,7 +78,9 @@ def test_build_filename_basic() -> None:
 
 
 def test_build_filename_default_template() -> None:
-    m = TrackMetadata(artist="Rick Astley", title="Never Gonna Give You Up", track_number=5, video_id="abc")
+    m = TrackMetadata(
+        artist="Rick Astley", title="Never Gonna Give You Up", track_number=5, video_id="abc"
+    )
     path = build_filename("{track_number:02d} - {artist} - {title}", m)
     assert path == Path("05 - Rick Astley - Never Gonna Give You Up.mp3")
 

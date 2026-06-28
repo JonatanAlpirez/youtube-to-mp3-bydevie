@@ -3,6 +3,7 @@
 Tolera comentarios (# y //), líneas vacías, IDs solos, dedupe preservando orden
 y descripción opcional después de la URL.
 """
+
 from __future__ import annotations
 
 import re
@@ -13,7 +14,9 @@ from pathlib import Path
 _YT_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
 
 # URL completa de YouTube
-_FULL_URL_RE = re.compile(r"https?://(?:www\.|m\.)?(?:youtube\.com/watch\?v=|youtu\.be/)([A-Za-z0-9_-]{11})")
+_FULL_URL_RE = re.compile(
+    r"https?://(?:www\.|m\.)?(?:youtube\.com/watch\?v=|youtu\.be/)([A-Za-z0-9_-]{11})"
+)
 
 
 @dataclass(frozen=True)

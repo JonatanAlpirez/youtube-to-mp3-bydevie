@@ -1,4 +1,5 @@
 """Descargador: orquesta yt-dlp + ffmpeg para cada link."""
+
 from __future__ import annotations
 
 import time
@@ -10,7 +11,6 @@ from loguru import logger
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import (
     DownloadError,
-    ExtractorError,
     UnavailableVideoError,
 )
 
@@ -19,12 +19,9 @@ from .linklist import LinkEntry
 from .metadata import TrackMetadata, build_metadata
 from .paths import build_filename, ensure_unique_path
 
-
 # Errores que yt-dlp lanza cuando el video NO está disponible (no reintentar).
 # Estos son permanentes: reintentar no va a cambiar el resultado.
-_PERMANENT_ERROR_TYPES: tuple[type[Exception], ...] = (
-    UnavailableVideoError,
-)
+_PERMANENT_ERROR_TYPES: tuple[type[Exception], ...] = (UnavailableVideoError,)
 
 # Mensajes de error que indican que NO vale la pena reintentar (permanentes).
 _PERMANENT_ERROR_MESSAGES: tuple[str, ...] = (
@@ -90,7 +87,9 @@ def _ydl_opts(config: Config, output_template: str) -> dict:
         "writethumbnail": config.embed_thumbnail,
         "postprocessor_args": {
             "ffmpeg_o": ["-id3v2_version", "4"],
-        } if config.embed_thumbnail else {},
+        }
+        if config.embed_thumbnail
+        else {},
     }
 
 
@@ -116,9 +115,7 @@ def _try_download(entry: LinkEntry, config: Config, track_number: int) -> Downlo
         info = ydl.extract_info(entry.url, download=False)
 
     metadata = _build_metadata_for_entry(entry, track_number, info, config)
-    target_filename = build_filename(
-        config.filename_template, metadata, ext=config.audio_format
-    )
+    target_filename = build_filename(config.filename_template, metadata, ext=config.audio_format)
     target_path = config.output_dir / target_filename
 
     # Skip si ya existe (a menos que --force)
@@ -206,9 +203,7 @@ def download_one(
                 break
 
             if attempt >= max_retries:
-                logger.error(
-                    f"❌ {entry.url} falló tras {attempt}/{max_retries} intentos: {e}"
-                )
+                logger.error(f"❌ {entry.url} falló tras {attempt}/{max_retries} intentos: {e}")
                 break
 
             # Backoff: 1s, 5s, 15s (configurable vía retry_backoff_base)
@@ -254,8 +249,7 @@ def download_all(entries: list[LinkEntry], config: Config) -> list[DownloadResul
     results: list[DownloadResult] = []
     with ThreadPoolExecutor(max_workers=config.concurrency) as executor:
         future_to_idx = {
-            executor.submit(download_one, entry, config, idx): idx
-            for idx, entry in indexed
+            executor.submit(download_one, entry, config, idx): idx for idx, entry in indexed
         }
         for future in as_completed(future_to_idx):
             result = future.result()
@@ -274,3 +268,19 @@ def write_failed_links(results: list[DownloadResult], output_path: str) -> int:
         lines.append(f"{r.entry.url}    {r.entry.description or ''}\n")
     Path(output_path).write_text("".join(lines), encoding="utf-8")
     return len(failed)
+
+
+def fetch_metadata(url: str) -> dict:
+    """Consulta metadata de un video sin descargar nada.
+
+    Útil para el comando `info`. Lanza yt-dlp.utils.* si hay error.
+    """
+    opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "noprogress": True,
+        "skip_download": True,
+        "extract_flat": False,
+    }
+    with YoutubeDL(opts) as ydl:
+        return ydl.extract_info(url, download=False)

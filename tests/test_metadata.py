@@ -1,14 +1,14 @@
 """Tests para metadata.py — extracción y limpieza de metadatos."""
+
 from __future__ import annotations
 
 from yt_links_mp3.metadata import (
+    build_metadata,
     cleanup_title,
     extract_artist,
     extract_cover_url,
     extract_title,
-    build_metadata,
 )
-
 
 # ------------------- cleanup_title -------------------
 

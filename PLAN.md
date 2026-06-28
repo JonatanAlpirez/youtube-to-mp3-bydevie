@@ -190,12 +190,13 @@ https://www.youtube.com/watch?v=4xDzrJKXOOY   Boiler Room (mezcla 1h)
 
 ### Fase 4 — Calidad y DX (2–3h)
 
-- [ ] Tests unitarios: extender cobertura a `paths.py`, `metadata.py`, `config.py`
-- [ ] `pre-commit` con `ruff`
-- [ ] CI con GitHub Actions (lint + tests en matrix Python 3.11/3.12)
-- [ ] `Makefile` con targets: `install`, `test`, `lint`, `run`
-- [ ] Comando `info <link>` que muestra metadata de un video sin descargar
-- [ ] Comando `info <archivo.txt>` que muestra tabla resumen (título, artista detectado, ya descargado sí/no)
+- [x] Tests unitarios: cobertura completa en `linklist.py` (9), `metadata.py` (36), `paths.py` (18), `config.py` (5), `downloader.py` (18), `cli.py` (15) — total 101/101 pasando.
+- [x] `pre-commit` con `ruff` (`.pre-commit-config.yaml`)
+- [x] CI con GitHub Actions: lint + tests en matrix Python 3.11/3.12 (`.github/workflows/tests.yml`)
+- [x] `Makefile` con targets: `install`, `test`, `lint`, `lint-fix`, `format`, `run`, `clean`
+- [x] Comando `info <link>` que muestra metadata de un video sin descargar
+- [x] Comando `info <archivo.txt>` que muestra tabla resumen (título, artista detectado, duración, ya descargado sí/no)
+- [x] `ruff check .` y `ruff format --check .` pasan limpios
 
 ### Fase 5 — Pulido (opcional)
 
@@ -302,8 +303,8 @@ yt-links-mp3 download ~/Music/links.txt.failed  # reintenta esos
 
 ## 🚦 Estado actual
 
-**Fase:** 3 — Robustez ✅ (reintentos con backoff, concurrencia real, skip explícito)
-**Próximo paso:** Fase 4 — Calidad y DX (tests, CI, Makefile, comando `info`)
+**Fase:** 4 — Calidad y DX ✅ (101 tests, ruff + pre-commit + CI, Makefile, comando `info`)
+**Próximo paso:** Fase 5 — Pulido (watch mode, MusicBrainz, otros sitios vía yt-dlp)
 
 ### Lo que funciona hoy
 - `yt-links-mp3 validate <archivo.txt>` → cuenta links válidos y reporta líneas ignoradas
@@ -316,7 +317,7 @@ yt-links-mp3 download ~/Music/links.txt.failed  # reintenta esos
 - Títulos limpios automáticamente (regex borra `Official Video`, `HD`, `(Lyric)`, etc.)
 - Skip automático: si el archivo final ya existe, no se re-descarga. `--force` para ignorar skip.
 - Override de metadatos vía hint en `links.txt` (formato `Artist - Title` o `Artist/Title`)
-- Tests: 86/86 pasando
+- Tests: 101/101 pasando
 
 ### Notas operativas
 - **Python 3.11 disponible** vía Homebrew (`/opt/homebrew/bin/python3.11`). `pyproject.toml` declara `>=3.9`.

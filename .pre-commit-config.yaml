@@ -1,0 +1,11 @@
+# pre-commit hooks para yt-links-mp3
+# Instalación: pip install pre-commit && pre-commit install
+# Uso: pre-commit run --all-files (o se ejecuta automáticamente en git commit)
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.8
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format

@@ -2,12 +2,12 @@
 
 Mockeamos yt_dlp.YoutubeDL y _try_download para no hacer requests reales.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 from yt_dlp.utils import DownloadError, ExtractorError, UnavailableVideoError
 
 from yt_links_mp3.config import Config
@@ -18,7 +18,6 @@ from yt_links_mp3.downloader import (
     write_failed_links,
 )
 from yt_links_mp3.linklist import LinkEntry
-
 
 # ------------------- Helpers -------------------
 
@@ -116,7 +115,6 @@ def test_retry_succeeds_after_transient_failures(tmp_path: Path) -> None:
     """Si _try_download falla N veces transitoriamente y luego funciona, retornar success."""
     config = _make_config(tmp_path, max_retries=3)
     entry = _make_entry()
-    info = _make_info()
 
     call_count = {"n": 0}
 
@@ -126,9 +124,15 @@ def test_retry_succeeds_after_transient_failures(tmp_path: Path) -> None:
             raise ConnectionError("network down")
         # Tercera vez: éxito
         from yt_links_mp3.downloader import DownloadResult
+
         return DownloadResult(
-            entry=e, success=True, output_path=str(tmp_path / "out.mp3"),
-            error=None, skipped=False, metadata=None, attempts=1,
+            entry=e,
+            success=True,
+            output_path=str(tmp_path / "out.mp3"),
+            error=None,
+            skipped=False,
+            metadata=None,
+            attempts=1,
         )
 
     with patch("yt_links_mp3.downloader._try_download", side_effect=fake_try):
@@ -184,8 +188,13 @@ def test_single_attempt_succeeds(tmp_path: Path) -> None:
 
     def succeed(e, c, t):
         return DownloadResult(
-            entry=e, success=True, output_path=str(tmp_path / "out.mp3"),
-            error=None, skipped=False, metadata=None, attempts=1,
+            entry=e,
+            success=True,
+            output_path=str(tmp_path / "out.mp3"),
+            error=None,
+            skipped=False,
+            metadata=None,
+            attempts=1,
         )
 
     with patch("yt_links_mp3.downloader._try_download", side_effect=succeed):
@@ -212,9 +221,15 @@ def test_skip_when_target_exists(tmp_path: Path) -> None:
         return info
 
     class FakeYDL:
-        def __init__(self, opts): pass
-        def __enter__(self): return self
-        def __exit__(self, *a): pass
+        def __init__(self, opts):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            pass
+
         def extract_info(self, url, download=True):
             return fake_extract_info(url, download)
 
@@ -236,12 +251,20 @@ def test_no_skip_with_force(tmp_path: Path) -> None:
     existing.touch()
 
     class FakeYDL:
-        def __init__(self, opts): pass
-        def __enter__(self): return self
-        def __exit__(self, *a): pass
+        def __init__(self, opts):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            pass
+
         def extract_info(self, url, download=True):
             return info
-        def download(self, urls): pass
+
+        def download(self, urls):
+            pass
 
     with patch("yt_links_mp3.downloader.YoutubeDL", FakeYDL):
         result = download_one(entry, config, track_number=1)
@@ -277,9 +300,15 @@ def test_download_all_runs_concurrently(tmp_path: Path) -> None:
         threads_seen.add(threading.get_ident())
         time.sleep(0.05)  # Para forzar overlap
         from yt_links_mp3.downloader import DownloadResult
+
         return DownloadResult(
-            entry=e, success=True, output_path=None,
-            error=None, skipped=False, metadata=None, attempts=1,
+            entry=e,
+            success=True,
+            output_path=None,
+            error=None,
+            skipped=False,
+            metadata=None,
+            attempts=1,
         )
 
     with patch("yt_links_mp3.downloader._try_download", side_effect=fake_try):

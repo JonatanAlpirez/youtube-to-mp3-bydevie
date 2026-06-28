@@ -3,6 +3,7 @@
 Regression test para SPEC-001: el config.example.yaml debe cargar
 correctamente con yaml.safe_load y Config.load().
 """
+
 from __future__ import annotations
 
 import re

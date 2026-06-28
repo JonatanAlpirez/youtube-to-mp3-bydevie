@@ -1,4 +1,5 @@
 """Tests del parser de links."""
+
 from pathlib import Path
 
 import pytest

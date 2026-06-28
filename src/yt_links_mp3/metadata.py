@@ -1,4 +1,5 @@
 """Extracción y limpieza de metadatos desde la info de yt-dlp."""
+
 from __future__ import annotations
 
 import re
