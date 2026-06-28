@@ -1,6 +1,6 @@
 # 🎵 yt-links-mp3
 
-Descargador de música desde YouTube a partir de un **archivo de texto con URLs** (una por línea). Convierte cada video a MP3 con `yt-dlp` + `ffmpeg`.
+Descargador de música a partir de un **archivo de texto con URLs** (una por línea). Convierte cada video a MP3 con `yt-dlp` + `ffmpeg`. Soporta YouTube y otros sitios compatibles con `yt-dlp` (SoundCloud, Bandcamp, Vimeo, etc.).
 
 > Pensado para uso personal: vos armás una lista curada de links en un `.txt`, y la herramienta los descarga uno a uno. Sin login, sin scraping de playlist, sin sorpresas.
 
@@ -292,7 +292,7 @@ yt-links-mp3 download ~/Music/links.txt
 # Días siguientes: agregás más links y volvés a correr
 vim ~/Music/links.txt
 yt-links-mp3 download ~/Music/links.txt
-# → con --force para re-descargar todo, o sin él para respetar lo que ya está
+# → sin --force respeta los que ya están descargados (skip automático por nombre)
 
 # Si algo falló (video privado, geo-block, etc.):
 cat ~/Music/links.txt.failed     # solo los que fallaron
@@ -323,7 +323,7 @@ make run ARGS='download links.txt'  # ejecuta el CLI
 make clean      # borra caches
 ```
 
-CI con GitHub Actions (`.github/workflows/tests.yml`): lint + tests en matrix Python 3.11/3.12. Pre-commit hooks (`.pre-commit-config.yaml`): ruff lint + format.
+CI con GitHub Actions (`.github/workflows/tests.yml`): lint + tests en matrix Python 3.10/3.11/3.12. Pre-commit hooks (`.pre-commit-config.yaml`): ruff lint + format.
 
 ## 🔍 Comando `info`
 
@@ -349,8 +349,10 @@ Para evitar llamadas repetidas a YouTube (lento, rate-limited), `yt-links-mp3` c
 
 ```yaml
 cache_path: ~/.cache/yt-links-mp3/metadata.json
-cache_ttl_seconds: 604800   # 7 días. 0 o null = sin expiración.
+cache_ttl_seconds: 604800   # 7 días. null = sin expiración. 0 = expira siempre.
 ```
+
+> Nota: `cache_ttl_seconds: 0` significa que la entrada expira al toque (porque cualquier tiempo transcurrido > 0). Solo `null` (sin valor, o línea comentada) significa "sin expiración".
 
 > El cache se aplica en `info` y en `download` (cuando vuelve a fetchear metadata de un link conocido). La primera corrida llena el cache; las siguientes son instantáneas.
 

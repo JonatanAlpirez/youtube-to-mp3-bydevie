@@ -57,7 +57,8 @@ failed_filename: "links.txt.failed"
 # aparece en varios archivos de links, o en varias corridas del mismo archivo.
 # Path por defecto: $XDG_CACHE_HOME/yt-links-mp3/metadata.json
 # (~/.cache/yt-links-mp3/metadata.json si XDG_CACHE_HOME no está definido)
-# Para desactivar el cache, comentá la línea (null).
+# Para desactivar el cache, comentá la línea.
 #cache_path: ~/.cache/yt-links-mp3/metadata.json
-# TTL en segundos. None o 0 = sin expiración. Default: 7 días.
+# TTL en segundos. null (sin valor) = sin expiración. Default: 7 días.
+# Nota: 0 significa "expira inmediatamente" (no es lo mismo que sin TTL).
 cache_ttl_seconds: 604800

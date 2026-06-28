@@ -6,7 +6,7 @@ Plan de implementación por fases, pensado para entregar valor temprano y valida
 
 ## 🎯 Objetivo
 
-Construir una herramienta CLI que lea un archivo de texto con URLs de videos individuales de YouTube (uno por línea) y descargue cada uno como MP3 con metadatos limpios, portada embebida y una estructura de carpetas ordenada por artista/álbum.
+Construir una herramienta CLI que lea un archivo de texto con URLs de videos individuales (uno por línea) y descargue cada uno como MP3 con metadatos limpios y portada embebida. Soporta YouTube y otros sitios compatibles con `yt-dlp` (SoundCloud, Bandcamp, Vimeo, etc.). Los archivos se guardan en una carpeta plana (sin subcarpetas por artista/álbum) con naming consistente `{NN} - {artist} - {title}.mp3`.
 
 ---
 
@@ -18,7 +18,7 @@ Construir una herramienta CLI que lea un archivo de texto con URLs de videos ind
 | 2 | CLI en Python + `click` | Ecosistema maduro, fácil de empaquetar, tests sencillos | Node.js (overkill), Go (recompilar deps), Bash (mantenimiento) |
 | 3 | Concurrencia con `ThreadPoolExecutor` | yt-dlp es I/O bound, threads son suficientes y simples | `asyncio` (overkill para subprocess), `multiprocessing` (más memoria) |
 | 4 | Postprocesado con `ffmpeg` directo | Control total sobre bitrate/metadatos, sin intermediarios | `mutagen` (solo metadatos, no convierte), `pydub` (envuelve ffmpeg) |
-| 5 | Config en YAML + pydantic | Validación, autocompletado, separación código/config | TOML (menos legible), JSON (sin comentarios) |
+| 5 | Config en YAML + pydantic BaseModel | Validación, autocompletado, separación código/config | TOML (menos legible), JSON (sin comentarios) |
 | 6 | Nombres por metadatos (no por título de video) | Un mismo video puede tener título "raro" pero artista/título correctos | Usar `--output` de yt-dlp directo (limitado) |
 | 7 | **Parser del archivo de links tolerante** | Aceptar líneas vacías, comentarios `#`, espacios, URLs con/sin `https://`, IDs solos (`dQw4w9WgXcQ`) | Parser estricto (frágil ante edición manual) |
 | 8 | Empaquetar como CLI instalable (`pip install -e .`) | Una vez instalado, se invoca como comando nativo | Script suelto (depende de PYTHONPATH) |
@@ -33,22 +33,29 @@ yt-links-mp3/
 ├── README.md
 ├── PLAN.md
 ├── config.example.yaml
-├── links.example.txt          # archivo de ejemplo con URLs
-├── src/
-│   └── yt_links_mp3/
-│       ├── __init__.py
-│       ├── cli.py              # entrypoint click (comandos: download, info, validate)
-│       ├── config.py           # pydantic-settings
-│       ├── linklist.py         # parser del archivo de URLs
-│       ├── downloader.py       # orquesta descargas (ThreadPoolExecutor)
-│       ├── paths.py            # plantillas de paths seguros (sanitización)
-│       ├── progress.py         # barras rich
-│       └── logging.py          # loguru config
+├── links.example.txt
+├── .pre-commit-config.yaml        # ruff lint + format hooks
+├── .github/workflows/tests.yml   # CI: lint + tests matrix 3.10/3.11/3.12
+├── Makefile                      # install, test, lint, format, run, clean
+├── src/yt_links_mp3/
+│   ├── cli.py              # entrypoint click: download, info, validate
+│   ├── config.py           # pydantic BaseModel (carga YAML)
+│   ├── linklist.py         # parser tolerante (YouTube + URLs genéricas)
+│   ├── downloader.py       # ThreadPoolExecutor + retry + fetch_metadata_cached
+│   ├── metadata.py         # TrackMetadata + cleanup_title + build_metadata
+│   ├── paths.py            # sanitize + build_filename + ensure_unique_path
+│   ├── cache.py            # MetadataCache persistente (JSON local)
+│   ├── progress.py         # barras rich
+│   └── logging.py          # loguru config
 └── tests/
-    └── test_linklist.py        # parser de links
+    ├── test_linklist.py    # parser (YouTube + sitios múltiples)
+    ├── test_metadata.py    # limpieza regex + extracción
+    ├── test_paths.py       # sanitización + naming
+    ├── test_config.py      # carga YAML + defaults
+    ├── test_downloader.py  # retry + concurrencia
+    ├── test_cli.py         # comando info + helpers
+    └── test_cache.py       # MetadataCache + extract_video_id
 ```
-
-> Los módulos `metadata.py` y `postprocess.py` se agregarán en Fase 2.
 
 ### Flujo de datos
 
@@ -56,25 +63,28 @@ yt-links-mp3/
 links.txt
    │
    ▼
-parse_link_file()          → list[LinkEntry(url, line_number, raw)]
+parse_link_file()          → list[LinkEntry(video_id, url, description, line_number)]
    │
    ▼ (filter vacíos, comentarios, dedupe preservando orden)
 list[LinkEntry]
    │
    ▼
-ThreadPoolExecutor
+build_metadata() para cada entry     (usa cache si está disponible)
+   │
+   ▼
+ThreadPoolExecutor (concurrency=N)
    │  ┌───────────────────────┐
    │  ▼                       ▼                       ▼
-download_audio        download_audio          download_audio
-(yt-dlp bestaudio)    (yt-dlp bestaudio)      (yt-dlp bestaudio)
+download_one          download_one            download_one
+(yt-dlp bestaudio     (yt-dlp bestaudio        (yt-dlp bestaudio
+ + retry x3 +         + retry x3 +             + retry x3 +
+ build MP3)           build MP3)               build MP3)
    │                       │                       │
    └───────────────────────┼───────────────────────┘
                            ▼
-                  postprocess_to_mp3
-                  (ffmpeg + metadatos + cover)
-                           │
-                           ▼
-                  output_dir/<Artist>/<Album>/NN - Title.mp3
+                  output_dir/<NN> - <artist> - <title>.mp3   (flat)
+                           +
+                  links.txt.failed  (solo si hay fallos)
 ```
 
 ---
@@ -106,11 +116,11 @@ https://www.youtube.com/watch?v=4xDzrJKXOOY   Boiler Room (mezcla 1h)
 | Línea vacía | Ignorada |
 | Línea que empieza con `#` | Ignorada (comentario) |
 | Línea que empieza con `//` | Ignorada (comentario estilo code) |
-| URL completa `https://...` | Aceptada |
-| URL corta `youtu.be/<id>` | Aceptada, normalizada |
-| Solo el ID de video (11 chars alfanuméricos + `-_`) | Aceptada, expandida a `https://youtu.be/<id>` |
+| URL completa de YouTube (`youtube.com/watch?v=ID`, `youtu.be/ID`, `youtube.com/shorts/ID`) | Aceptada, normalizada a `https://youtu.be/<id>` |
+| Solo el ID de video de YouTube (11 chars alfanuméricos + `-_`) | Aceptado, expandido a `https://youtu.be/<id>` |
+| Cualquier URL `http(s)://` (SoundCloud, Bandcamp, Vimeo, etc.) | Aceptada tal cual. `yt-dlp` elige el extractor por la URL. |
 | Texto después de la URL (separado por espacios o tab) | Se guarda como `description` opcional (puede usarse como hint para metadatos) |
-| URL duplicada | Se deduplica preservando la primera aparición |
+| Duplicado por video_id (YouTube) o URL completa (otros sitios) | Se deduplica preservando la primera aparición |
 | Línea que no matchea nada | Warning + skip (no aborta) |
 | Encoding | UTF-8 estricto, BOM tolerado |
 
@@ -173,17 +183,18 @@ https://www.youtube.com/watch?v=4xDzrJKXOOY   Boiler Room (mezcla 1h)
 
 ### Fase 4 — Calidad y DX ✅
 
-- 101 tests unitarios pasando: `linklist.py` (9), `metadata.py` (36), `paths.py` (18), `config.py` (5), `downloader.py` (18), `cli.py` (15)
+- 125 tests unitarios pasando (ver Fase 5 para la distribución completa actualizada)
 - `pre-commit` con `ruff` lint + format (`.pre-commit-config.yaml`)
-- CI con GitHub Actions: lint + tests en matrix Python 3.11/3.12
+- CI con GitHub Actions: lint + tests en matrix Python 3.10/3.11/3.12
 - `Makefile` con targets: `install`, `test`, `lint`, `lint-fix`, `format`, `run`, `clean`
 - `ruff check .` y `ruff format --check .` pasan limpios
 
-### Fase 5 — Pulido (en progreso)
+### Fase 5 — Pulido ✅
 
-- [ ] Cache de metadatos para evitar refetch
-- [ ] Soporte para SoundCloud, Bandcamp (vía yt-dlp)
-- [ ] Empaquetado para `pipx`
+- Cache persistente de metadata (`~/.cache/yt-links-mp3/metadata.json`) con TTL configurable (default 7 días). Acelera `info` y `download` cuando un video aparece varias veces.
+- Soporte para sitios múltiples vía yt-dlp: SoundCloud, Bandcamp, Vimeo y cualquier URL `http(s)://`. El parser acepta URLs genéricas además de las de YouTube.
+- Empaquetable con `pipx` para uso como comando global sin venv manual.
+- Tests: **125/125 pasando** — `linklist.py` (17: 9 YouTube + 8 multi-sitio), `metadata.py` (36), `paths.py` (18), `config.py` (5), `downloader.py` (18), `cli.py` (15), `cache.py` (16).
 
 ### Fase 6 — Futuras ideas
 
@@ -206,13 +217,16 @@ EOF
 # 2. Validar (sin descargar)
 yt-links-mp3 validate /tmp/links.txt
 
-# 3. Dry-run
+# 3. Ver metadata sin descargar
+yt-links-mp3 info /tmp/links.txt
+
+# 4. Dry-run
 yt-links-mp3 download /tmp/links.txt --dry-run
 
-# 4. Descargar de verdad
+# 5. Descargar de verdad
 yt-links-mp3 download /tmp/links.txt -o /tmp/test
 
-# 5. Verificar
+# 6. Verificar
 ls -la /tmp/test/
 ffprobe "/tmp/test/<archivo>.mp3"
 ```
@@ -220,10 +234,13 @@ ffprobe "/tmp/test/<archivo>.mp3"
 Verificar:
 - El ID duplicado (`dQw4w9WgXcQ`) aparece solo una vez
 - Comentarios y líneas vacías no generan downloads
-- Archivos con nombres consistentes
-- `ffprobe archivo.mp3` muestra metadatos
+- Archivos con nombres consistentes (`NN - Artist - Title.mp3`)
+- `ffprobe archivo.mp3` muestra metadatos (artista, título, álbum si está)
 - Portada visible en Finder/VLC
 - No quedan archivos `.part` o `.tmp`
+- Una segunda corrida del mismo archivo: todos como `skip`
+- `info` muestra tabla con N, Artista, Título, Duración, Descargado
+- `info` con cache deshabilitado igual funciona; con cache activado la 2da corrida es instantánea
 
 ---
 
@@ -258,14 +275,16 @@ yt-links-mp3 download ~/Music/links.txt.failed  # reintenta esos
 | Archivo de links mal formateado (URLs inválidas, encoding raro) | Parser tolerante: warn + skip líneas malas, no abortar |
 | Metadatos sucios (track con "Official Video" en el título) | Heurísticas de limpieza en `metadata.py`; permitir override manual |
 | Copyright / DMCA | Disclaimer prominente en README; el proyecto es personal |
-| Rate limiting de YouTube | Concurrencia baja por defecto (3), respeto a `--limit-rate` de yt-dlp |
+| Rate limiting de YouTube | Concurrencia baja por defecto (3) + cache persistente de metadata |
 | El usuario pone la misma URL dos veces sin darse cuenta | Dedupe preservando orden + warning "URL duplicada en línea N" |
+| Sitios no-YouTube con rate limits agresivos (SoundCloud) | Cache de metadata reduce llamadas; retry con backoff ya implementado |
+| Python 3.9 deprecado por yt-dlp y pydantic 2 | `pyproject.toml` declara `>=3.10`; CI matrix 3.10/3.11/3.12 |
 
 ---
 
 ## 📊 Estimación restante
 
-~6–10 horas para llegar a Fase 3 funcional (metadatos + robustez). Fase 4 y 5 son nice-to-have.
+Fase 6 (MusicBrainz + estructura por artista/álbum) estimada en ~6–10 horas. No hay bloqueantes conocidos.
 
 ---
 
